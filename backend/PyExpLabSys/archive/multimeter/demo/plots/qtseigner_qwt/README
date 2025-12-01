@@ -1,3 +1,0 @@
-The simple_plot.ui file from QtDesigner is translated into simple_plot.py with the command:
-
-    pyuic4 simple_plot.ui > simple_plot.py
