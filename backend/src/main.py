@@ -10,12 +10,19 @@ from src.controller import Controller      # 🎛️ The UV Controller Interface
 
 # 🌟 NEW: Initialize the Controller (This is done ONCE when the server starts) 🌟
 try:
-    # Initialize the controller, which attempts to connect to the hardware
+    # Initialize the controller, which now handles its own connection errors!
     UV_CONTROLLER = Controller()
-    print("✨ UV Controller initialized and connected to hardware!")
+    
+    # We check if it connected successfully
+    if UV_CONTROLLER.is_connected:
+        print("✨ UV Controller initialized and connected to hardware!")
+    else:
+        print("🟡 UV Controller initialized in SAFE MODE.")
+
 except Exception as e:
-    print(f"🛑 HARDWARE CONNECTION FAILED: {e}")
-    UV_CONTROLLER = None # Set to None if connection fails
+    # This block catches errors preventing the Controller class from even starting
+    print(f"🛑 CRITICAL ERROR: Could not create Controller instance: {e}")
+    UV_CONTROLLER = None
 
 
 
