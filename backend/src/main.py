@@ -1,102 +1,133 @@
-# main.py
+# --- src/main.py: THE FASTAPI COMMAND CENTER ---
 
-# --- 📚 IMPORTING THE NECESSARY TOOLS (Python Libraries) ---
+# 1. CORE IMPORTS & SETUP
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware # 🛡️ The Security Guard (CORS)
-from pydantic import BaseModel                   # 🗺️ The Data Mapper (Pydantic)
-import uvicorn                                   # 🚀 The Server Launcher (Uvicorn)
-from src.controller import Controller      # 🎛️ The UV Controller Interface
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import uvicorn
+import time             # Needed for time.sleep() in the background thread
+import threading        # 🌟 Needed to run the long procedure without blocking the server 🌟
+from src.controller import Controller
 
-
-# 🌟 NEW: Initialize the Controller (This is done ONCE when the server starts) 🌟
-try:
-    # Initialize the controller, which now handles its own connection errors!
-    UV_CONTROLLER = Controller()
-    
-    # We check if it connected successfully
-    if UV_CONTROLLER.is_connected:
-        print("✨ UV Controller initialized and connected to hardware!")
-    else:
-        print("🟡 UV Controller initialized in SAFE MODE.")
-
-except Exception as e:
-    # This block catches errors preventing the Controller class from even starting
-    print(f"🛑 CRITICAL ERROR: Could not create Controller instance: {e}")
-    UV_CONTROLLER = None
-
-
-
-
-# --- 🗺️ DATA MAP: The Pydantic Model (Telling the server what data looks like) ---
-
-# Think of this class like a clear blueprint or a contract for ONE step of the procedure.
-# When React sends data, FastAPI uses this map to check if the structure is correct.
+# ----------------------------------------------------------------------
+# 2. DATA BLUEPRINT: The Pydantic Model
+# This defines the expected structure of one step from the frontend.
 class ProcedureStep(BaseModel):
-    # This says: I MUST receive a variable named 'time' and it MUST be a string.
     time: str
-    # And I MUST receive a variable named 'intensity' and it MUST be a whole number (integer).
     intensity: int
 
-# --- ⚙️ SERVER SETUP ---
+class ProcedureRequest(BaseModel):
+    steps: list[ProcedureStep]
+    selected_channels: list[int]
 
-# 1. Initialize the FastAPI app
-# 'app' is the main Python brain that receives and handles all web traffic.
+# ----------------------------------------------------------------------
+# 3. SERVER SETUP & SECURITY (CORS)
 app = FastAPI()
 
-# --- 🛡️ SECURITY CHECK: CROSS-ORIGIN (CORS) ---
-
-# 2. CORS: This is the security rule that prevents your browser from saying,
-#    "Hey, React is on port 5173, but Python is on port 8000. That looks suspicious!"
 origins = [
-    # We must explicitly tell the server to trust and allow traffic from your frontend's address.
-    "http://localhost:5173",  
+    "http://localhost:5173",  # Trust your React development server
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, # Only allow connections from your safe React address.
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],   # Allow all request types (GET, POST, etc.)
-    allow_headers=["*"],   # Allow standard data headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# --- 📞 API ENDPOINTS (The "Phone Numbers" your React app calls) ---
+# ----------------------------------------------------------------------
+# 4. HARDWARE INITIALIZATION (Runs ONCE at Server Startup)
+try:
+    # Initialize the Controller. It will either connect or go into SAFE MODE.
+    UV_CONTROLLER = Controller()
+    
+    if UV_CONTROLLER.is_connected:
+        print("✨ UV Controller initialized and connected to hardware!")
+    else:
+        print("🟡 UV Controller initialized in SAFE MODE (Hardware not plugged in).")
 
-# 3. GET Endpoint: The "Are You Awake?" check
-#    @app.get("/") means "When someone visits the root address (like '...:8000/'), do this."
+except Exception as e:
+    print(f"🛑 CRITICAL ERROR: Could not create Controller instance: {e}")
+    UV_CONTROLLER = None
+
+# ----------------------------------------------------------------------
+# 5. BACKGROUND WORKER FUNCTION (The Non-Blocking Procedure Runner)
+
+# This function contains the entire UV sequence and runs in a separate thread.
+def run_procedure_in_background(uv_controller: Controller, request_data: ProcedureRequest):
+    
+    procedure_data = request_data.steps
+    selected_channels = request_data.selected_channels
+    
+    total_steps = len(procedure_data)
+    # ⚠️ Adjust this list if the frontend sends the selected channels ⚠️
+    selected_channels = [1, 2, 3, 4] 
+    
+    # START PROCEDURE NOTIFICATION
+    print(f"✅ PROCEDURE STARTING: Initiating sequence with {total_steps} steps.")
+
+    for index, step in enumerate(procedure_data):
+        step_number = index + 1
+        
+        # 1. Stop Condition: If intensity is 0 or less, break the loop
+        if step.intensity <= 0:
+            print(f"🛑 Stopping procedure at Step {step_number}: Intensity is zero.")
+            break 
+        
+        # 2. Convert Time
+        try:
+            time_s = float(step.time)
+        except ValueError:
+            time_s = 1.0 # Default time
+
+        # 3. NOTIFY START OF STEP
+        print(f"▶️ STEP {step_number} STARTED: Intensity {step.intensity} for {time_s} seconds.")
+
+        # 4. HARDWARE COMMAND: Set Intensity (The first action)
+        uv_controller.func_set_uv_intensity(step.intensity)
+        
+        # 5. HARDWARE COMMAND: Turn UV ON (The second action)
+        uv_controller.func_uv_on(selected_channels)
+        
+        # 6. TIMING: Wait for the required time (This is time.sleep(), safe in this thread!)
+        print(f"😴 Thread is sleeping for {time_s} seconds...")
+        time.sleep(time_s) 
+        
+    # PROCEDURE END ACTIONS
+    uv_controller.func_uv_off() # Always turn UV OFF for safety!
+    print("🛑 PROCEDURE ENDED: All steps complete. System idle.")
+
+# ----------------------------------------------------------------------
+# 6. API ENDPOINTS (The "Phone Numbers" your React app calls)
+
+# GET Endpoint: Server Health Check
 @app.get("/")
 def read_root():
-    # Sends a friendly 'Hello' message back in a format the web understands (JSON).
     return {"message": "Hello from FastAPI backend! Connection successful, puppy! 🥳"}
 
-# 4. POST Endpoint: The "Start the Procedure" command
-#    @app.post("/start_procedure") means "When React SENDS data to this specific address, do this."
+# POST Endpoint: Start the Procedure Command
 @app.post("/start_procedure")
-# FastAPI automatically checks the incoming data against our list of 'ProcedureStep' blueprints.
-def start_procedure(procedure_data: list[ProcedureStep]):
+def start_procedure(requesst_data: ProcedureRequest):
     
-    # 🌟 STEP 1: Process the data sent by React 🌟
-    intensity_list = []
-
-    # Loop through the list of steps (which we know are clean because of Pydantic!)
-    for step in procedure_data:
-        # Pull out ONLY the intensity number from each step object.
-        intensity_list.append(step.intensity)
+    # A. Check initialization status
+    if UV_CONTROLLER is None or not UV_CONTROLLER.is_connected:
+        return {"status": "error", "message": "Server is in SAFE MODE. Hardware not available."}
     
-    # Send a message to the Uvicorn terminal (your console) to confirm it worked.
-    print(f"Received total steps: {len(procedure_data)}")
-    print(f"All Intensities Received: {intensity_list}")    
+    # B. LAUNCH THE THREAD: The long task is passed to a background thread!
+    try:
+        worker_thread = threading.Thread(
+            target=run_procedure_in_background,
+            args=(UV_CONTROLLER, requesst_data)
+        )
+        worker_thread.start() # Start the thread immediately!
+        
+    except Exception as e:
+        print(f"🛑 THREADING ERROR: Could not start background procedure: {e}")
+        return {"status": "error", "message": "Failed to start background procedure."}
 
-    # 🌟 STEP 2: Send a confirmation message back to React 🌟
+    # C. Send an IMMEDIATE success message back to React! Server is NOT blocked.
     return {
         "status": "success", 
-        "total_steps_received": len(procedure_data), 
-        "recvied_intensities": intensity_list # Sending the list back for confirmation!
+        "message": "Procedure initiated successfully in background thread."
     }
-
-# --- 🚀 SERVER LAUNCH INSTRUCTIONS ---
-
-# To run this server, you must be in the 'backend' folder with the venv active.
-
-# The magical command that launches the server:
-# uvicorn src.main:app --app-dir . --reload
