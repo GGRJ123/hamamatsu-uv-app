@@ -2,25 +2,8 @@ import time
 from PyExpLabSys.drivers.hamamatsu import LCL1V5
 import serial
 from serial.tools import list_ports
+import os
 
-# 🌟 NEW FUNCTION: Finds the correct port address 🌟
-def find_hamamatsu_port():
-    # ⚠️ NOTE: You may need to replace 'USB-SERIAL' with the exact description 
-    # that appears next to your device in Windows Device Manager!
-    SEARCH_STRING = 'USB-SERIAL' 
-    
-    # Iterate through all available ports on the system
-    ports = list_ports.comports()
-    for port in ports:
-        # Check if the port's description contains our search string
-        # On Windows, this often contains the chip type (like 'FTDI' or 'Prolific')
-        if SEARCH_STRING in port.description:
-            print(f"✅ Auto-Detected Hamamatsu Device on Port: {port.device}")
-            return port.device  # Returns the port name (e.g., 'COM3' or '/dev/ttyUSB0')
-        
-    # If no matching port is found after checking all of them
-    print(f"🛑 Error: Hamamatsu device not found. No port description contains '{SEARCH_STRING}'.")
-    return None # Return None if nothing is found
 
 class Controller:
 
@@ -29,13 +12,6 @@ class Controller:
 
     def __init__(self):
 
-        port_name = find_hamamatsu_port()
-        if port_name is None:
-            self.is_connected = False
-            self.lc_l1v5 = None
-            print("         --> Application is running in SAFE MODE.")
-            return
-        x
         try:
             # connects to the conntroller through the port
             self.lc_l1v5 = LCL1V5(port='COM8')
@@ -54,16 +30,7 @@ class Controller:
             self.is_connected = False
             print(f"⚠️ WARNING: An unexpected error occurred while connecting to hardware: {e}")
 
-        # 🌟 NEW: A method to check the connection before sending commands
-    def check_connection(self):
-        if not self.is_connected:
-            print("🚫 Controller: Command blocked. No device connected.")
-            return False
-        return True
-
     def func_set_uv_intensity(self, value):
-        if not self.check_connection():
-            return
         if value < 0:
             value = "000"
         elif value < 10:
@@ -77,8 +44,6 @@ class Controller:
 
     #WARNING!!!!! Turns on all channel and turns on the uv
     def func_uv_on(self, uv_selected):
-        if not self.check_connection():
-            return
         time.sleep(0.5)
         for i in uv_selected:
             self.lc_l1v5.switch_led_on(i)
