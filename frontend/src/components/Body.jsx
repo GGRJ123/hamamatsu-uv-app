@@ -60,27 +60,54 @@ function Body() {
   // --- PROCEDURE FUNCTIONS ---
 
   // Called by the "Start Procedure" button.
-  const startProcedure = (list) => {
+  const startProcedure = async (list) => {
     // This is where the FastAPI call will eventually go.
 
-    // 1. Save the full list of steps.
-    setProcedureList(list);
+    const API_URL = "http://127.0.0.1:8000/start_procedure";
+    const requestPayload = {
+      steps: list,
+      selected_channels: selectedChannels,
+    };
 
-    if (list.length > 0) {
-      const initialSeconds = timeStringToSeconds(list[0].time);
-
-      // Start the timer only if the first step's time is not zero.
-      if (initialSeconds > 0) {
-        setCurrentStepIndex(0); // Start at step 1.
-        setCurrentStepSeconds(initialSeconds); // Load time.
-        setIsRunning(true); // Turn timer ON.
-      } else {
-        // If first step time is zero, reset everything.
-        setCurrentStepIndex(-1);
-        setCurrentStepSeconds(0);
-        setIsRunning(false);
-        console.log("Procedure failed: Step 1 time is 00:00:00.");
+    console.log("Starting procedure with payload:", requestPayload);
+    try {
+      const response = await fetch(API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("FastAPI Error:", errorData);
+        throw new Error("FastAPI request failed");
       }
+
+      // 1. Save the full list of steps.
+      setProcedureList(list);
+
+      if (list.length > 0) {
+        const initialSeconds = timeStringToSeconds(list[0].time);
+
+        // Start the timer only if the first step's time is not zero.
+        if (initialSeconds > 0) {
+          setCurrentStepIndex(0); // Start at step 1.
+          setCurrentStepSeconds(initialSeconds); // Load time.
+          setIsRunning(true); // Turn timer ON.
+        } else {
+          // If first step time is zero, reset everything.
+          setCurrentStepIndex(-1);
+          setCurrentStepSeconds(0);
+          setIsRunning(false);
+          console.log("Procedure failed: Step 1 time is 00:00:00.");
+        }
+      }
+    } catch (error) {
+      console.error("Failed to communivate with FASTAPI:", error);
+      alert(
+        "Error: Could not start procedure. IS your uvicorn running on port 8000?"
+      );
     }
   };
 

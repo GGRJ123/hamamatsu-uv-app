@@ -139,6 +139,17 @@ function ProcedureSelection({ onStart }) {
     setIntensity(newIntensities);
     setRawTime(newTimes);
   };
+
+  const handleStopProcedure = async () => {
+    try {
+      await fetch("http://localhost:8000/stop_procedure", {
+        method: "POST",
+      });
+      console.log("Stop procedure request sent.");
+    } catch (error) {
+      console.error("Failed to send stop signal to server:", error);
+    }
+  };
   // --- RENDER SECTION ---
 
   return (
@@ -177,7 +188,7 @@ function ProcedureSelection({ onStart }) {
           Start Procedure
         </button>
         {/* Stop Button (currently inactive) */}
-        <button type="button" className="col-3">
+        <button type="button" className="col-3" onClick={handleStopProcedure}>
           Stop Procedure
         </button>
         <select
