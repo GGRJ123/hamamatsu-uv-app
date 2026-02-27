@@ -1,9 +1,9 @@
-import UVController from "./components/UVController";
+import Body from "./components/Body";
 
 function App() {
   return (
     <div>
-      <UVController />
+      <Body />
     </div>
   );
 }

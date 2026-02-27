@@ -17,7 +17,7 @@ class Controller:
     lc_l1v5 = None
     is_connected = False
     is_running = False
-    should_stop = False
+    is_paused = False
 
     def __init__(self):
 
@@ -39,6 +39,11 @@ class Controller:
             self.is_connected = False
             print(f"⚠️ WARNING: An unexpected error occurred while connecting to hardware: {e}")
 
+    def toggle_pause(self):
+        self.is_paused = not self.is_paused
+        print(f"Controller: Procedure toggled to {'PAUSED' if self.is_paused else 'RUNNING'}")
+        return self.is_paused
+
     def start_procedure(self, request_data):
         procedure_thread = threading.Thread(
             target=self.run_procedure, 
@@ -49,7 +54,7 @@ class Controller:
     
     def stop_procedure_signal(self):
         if self.is_running:
-            self.should_stop = True
+            self.is_paused = True
             print("Controller: Recieved stop signal.")
             return True
         return False
@@ -59,7 +64,7 @@ class Controller:
         Executes the step-by-step UV procedure. Runs in a separate thread.
         """
         self.is_running = True
-        self.should_stop = False
+        self.is_paused = False
         
         if not self.is_connected:
             print("Controller: SAFE MODE. Cannot execute procedure (no hardware).")
@@ -78,7 +83,7 @@ class Controller:
         for index, step in enumerate(request_data.steps):
             
             # 🌟 Check for stop signal at the start of every step 🌟
-            if self.should_stop:
+            if self.is_paused:
                 break 
 
             total_seconds = time_string_to_seconds(step.time)
@@ -94,11 +99,11 @@ class Controller:
             
             # Wait for the step duration, checking the stop flag every second
             for _ in range(total_seconds):
-                if self.should_stop:
+                if self.is_paused:
                     break 
                 time.sleep(1) # Wait for 1 second at a time
             
-            if self.should_stop:
+            if self.is_paused:
                 break # Break out of the step loop if the sleep was interrupted
 
         # 3. Cleanup: Always turn everything off and reset flags!

@@ -1,0 +1,58 @@
+{
+    "1": {
+        "procedure": "W-Band Bulk",
+        "step_count": 1,
+        "steps": [
+            {
+                "time": "00:03:00",
+                "intensity": 100
+            }
+        ]
+    },
+    "2": {
+        "procedure": "TFLN_NEW",
+        "step_count": 10,
+        "steps": [
+            {
+                "time": "00:00:03",
+                "intensity": 1
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 2
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 3
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 4
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 5
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 6
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 7
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 8
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 9
+            },
+            {
+                "time": "00:00:03",
+                "intensity": 10
+            }
+        ]
+    }
+}
